@@ -5,45 +5,64 @@
 
 use profile::profile;
 
-use codemap_diagnostic::{Diagnostic, Level};
 use codemap::{File, Span, SpanLoc};
-use rnix::parser::{AST, ParseError};
-
+use codemap_diagnostic::{Diagnostic, Level, SpanLabel, SpanStyle};
+use rnix::parser::{NodeType, ParseError, Types, AST};
+use rnix::tokenizer::Token;
+use rnix::types::*;
+use rowan::{OwnedRoot, TreeRoot};
 use std::fmt;
 use std::sync::Arc;
-use codemap_diagnostic::SpanLabel;
-use codemap_diagnostic::SpanStyle;
 
 #[derive(Debug)]
 pub struct Error {
     span: Span,
     span_loc: SpanLoc,
-    inner: ParseError,
+    message: String,
 }
 
 impl Error {
-    fn from_inner(source: Arc<File>, error: ParseError) -> Self {
-        let span = error_span(&source, &error);
+    pub fn at<N, M, R>(source: Arc<File>, node: &N, message: M) -> Self
+    where
+        N: TypedNode<R>,
+        M: Into<String>,
+        R: TreeRoot<Types>,
+    {
+        let range = node.node().range();
+        let span = source.span.subspan(
+            range.start().to_usize() as u64,
+            range.end().to_usize() as u64,
+        );
 
-        Error {
+        Self {
             span_loc: SpanLoc {
                 begin: source.find_line_col(span.low()),
                 end: source.find_line_col(span.high()),
                 file: source,
             },
             span,
-            inner: error,
+            message: message.into(),
         }
     }
 
-    fn message(&self) -> String {
-        error_fmt(&self.inner)
+    fn from_inner(source: Arc<File>, error: ParseError) -> Self {
+        let span = error_span(&source, &error);
+
+        Self {
+            span_loc: SpanLoc {
+                begin: source.find_line_col(span.low()),
+                end: source.find_line_col(span.high()),
+                file: source,
+            },
+            span,
+            message: error_fmt(&error),
+        }
     }
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        writeln!(f, "syntax error at {}: {}", self.span_loc, self.message())
+        writeln!(f, "syntax error at {}: {}", self.span_loc, self.message)
     }
 }
 
@@ -53,28 +72,13 @@ impl Into<Diagnostic> for Error {
             level: Level::Error,
             message: format!("could not parse {}", self.span_loc.file.name()),
             code: None,
-            spans: vec![
-                SpanLabel {
-                    span: self.span,
-                    label: Some(self.message()),
-                    style: SpanStyle::Primary,
-                }
-            ],
+            spans: vec![SpanLabel {
+                span: self.span,
+                label: Some(self.message),
+                style: SpanStyle::Primary,
+            }],
         }
     }
-}
-
-/// Parses a Nix expression.
-pub fn parse(file: &Arc<File>) -> Result<AST, Error> {
-    profile("parsing", file.name(), || parse_impl(file))
-}
-
-fn parse_impl(expr: &Arc<File>) -> Result<AST, Error> {
-    let ast = rnix::parse(expr.source());
-
-    extract_error(expr, ast.errors())?;
-
-    Ok(ast)
 }
 
 /// Takes a list of `ParseErrors` and tries to extract a human-readable parsing
@@ -90,10 +94,14 @@ fn extract_error(source: &Arc<File>, mut errors: Vec<ParseError>) -> Result<(), 
         match e {
             ParseError::Unexpected(node) => {
                 // The node might point to an empty part of the input, so give those a low rank
-                if node.range().is_empty() { 1 } else { 2 }
+                if node.range().is_empty() {
+                    1
+                } else {
+                    2
+                }
             }
-            ParseError::UnexpectedEOFWanted(_)  => 1, // at least contains the expected token
-            ParseError::UnexpectedEOF           => 0, // almost no information
+            ParseError::UnexpectedEOFWanted(_) => 1, // at least contains the expected token
+            ParseError::UnexpectedEOF => 0,          // almost no information
         }
     }
 
@@ -101,7 +109,7 @@ fn extract_error(source: &Arc<File>, mut errors: Vec<ParseError>) -> Result<(), 
         return Ok(());
     }
 
-    errors.sort_by_key(rank_error);  // (should be a stable sort)
+    errors.sort_by_key(rank_error); // (should be a stable sort)
 
     trace!("{} errors:", errors.len());
     for error in &errors {
@@ -115,16 +123,12 @@ fn extract_error(source: &Arc<File>, mut errors: Vec<ParseError>) -> Result<(), 
 
 fn error_fmt(error: &ParseError) -> String {
     match error {
-        ParseError::Unexpected(node) => {
-            format!("unexpected input near `{}`", node)
-        },
-        ParseError::UnexpectedEOF => {
-            "unexpected end of input".into()
-        },
+        ParseError::Unexpected(node) => format!("unexpected input near `{}`", node),
+        ParseError::UnexpectedEOF => "unexpected end of input".into(),
         ParseError::UnexpectedEOFWanted(token) => {
             // FIXME impl display for token
             format!("unexpected end of input (expected {:?})", token)
-        },
+        }
     }
 }
 
@@ -133,21 +137,36 @@ fn error_span(source: &File, error: &ParseError) -> Span {
         ParseError::Unexpected(node) => {
             // convert range to span
             let range = node.range();
-            source.span.subspan(range.start().to_usize() as u64, range.end().to_usize() as u64)
-        },
-        ParseError::UnexpectedEOFWanted(_) | ParseError::UnexpectedEOF  => {
+            source.span.subspan(
+                range.start().to_usize() as u64,
+                range.end().to_usize() as u64,
+            )
+        }
+        ParseError::UnexpectedEOFWanted(_) | ParseError::UnexpectedEOF => {
             // put the span at the end of the input
             source.span.subspan(source.span.len(), source.span.len())
         }
     }
 }
 
-use rnix::types::*;
-use rowan::TreeRoot;
-use rnix::parser::Types;
+/// Parses a Nix expression.
+pub fn parse(file: &Arc<File>) -> Result<RawExpr<OwnedRoot<Types>>, Error> {
+    profile("parsing", file.name(), || parse_impl(file))
+}
 
-/// An AST node representing an expression.
-pub enum Expr<R: TreeRoot<Types>> {
+fn parse_impl(expr: &Arc<File>) -> Result<RawExpr<OwnedRoot<Types>>, Error> {
+    let ast = rnix::parse(expr.source());
+
+    extract_error(expr, ast.errors())?;
+
+    Ok(RawExpr::from_raw(ast.into_node().first_child().unwrap()))
+}
+
+/// A raw expression parse tree.
+///
+/// This is a slim wrapper around `rnix`'s types that does the downcasting for
+/// you.
+pub enum RawExpr<R: TreeRoot<Types>> {
     Apply(Apply<R>),
     Assert(Assert<R>),
     /// An identifier.
@@ -172,19 +191,16 @@ pub enum Expr<R: TreeRoot<Types>> {
     With(With<R>),
 }
 
-impl<R: TreeRoot<Types>> Expr<R> {
+impl<R: TreeRoot<Types>> RawExpr<R> {
     /// Converts a raw AST node to an `Expr` node.
     ///
     /// If `node` is not a valid expression node, this function will panic.
     pub fn from_raw(node: rnix::parser::Node<R>) -> Self {
-        use rnix::parser::NodeType;
-        use rnix::tokenizer::Token;
-
         macro_rules! match_expr {
             ( $($node:tt),* else($elvar:ident) $el:expr ) => {
                 match node.kind() {
                     $(
-                    NodeType::$node => Expr::$node($node::cast(node).unwrap()),
+                    NodeType::$node => RawExpr::$node($node::cast(node).unwrap()),
                     )*
 
                     $elvar => $el
@@ -199,9 +215,9 @@ impl<R: TreeRoot<Types>> Expr<R> {
             else(kind) {
                 match kind {
                     // Ident = NodeType::Token(Token::Ident(_))
-                    NodeType::Token(Token::Ident) => Expr::Ident(Ident::cast(node).unwrap()),
+                    NodeType::Token(Token::Ident) => RawExpr::Ident(Ident::cast(node).unwrap()),
                     // Value = ???
-                    NodeType::Token(t) if t.is_value() => Expr::Value(Value::cast(node).unwrap()),
+                    NodeType::Token(t) if t.is_value() => RawExpr::Value(Value::cast(node).unwrap()),
                     _ => panic!("unexpected AST node kind: {:?} (expected expression)", kind),
                 }
             }

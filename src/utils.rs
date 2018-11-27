@@ -2,6 +2,9 @@ use codemap_diagnostic::{Diagnostic, Emitter};
 
 use std::str::FromStr;
 
+/// Trait for all types that have access to a diagnostic emitter.
+///
+/// Any type implementing this can be passed to `ResultExt::print_diagnostic`.
 pub trait DiagnosticEmitter {
     fn emit_diagnostics(&mut self, diags: &[Diagnostic]);
 }
@@ -16,19 +19,22 @@ impl<'a> DiagnosticEmitter for Emitter<'a> {
 /// the console and replaced with this type to signal that no further error
 /// printing is needed.
 #[derive(Debug, Fail)]
-#[fail(display = "")]
+#[fail(display = "(this should not be printed)")]
 pub struct ErrorAlreadyPrinted;
 
 pub trait ResultExt<T> {
     fn print_diagnostic<M>(self, emitter: &mut M) -> Result<T, ErrorAlreadyPrinted>
-        where M: DiagnosticEmitter;
+    where
+        M: DiagnosticEmitter;
 }
 
 impl<T, E> ResultExt<T> for Result<T, E>
-    where E: Into<Diagnostic> {
-
+where
+    E: Into<Diagnostic>,
+{
     fn print_diagnostic<M>(self, emitter: &mut M) -> Result<T, ErrorAlreadyPrinted>
-        where M: DiagnosticEmitter
+    where
+        M: DiagnosticEmitter,
     {
         self.map_err(|e| {
             emitter.emit_diagnostics(&[e.into()]);

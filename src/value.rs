@@ -1,7 +1,7 @@
 //! Defines dynamically typed Nix expression values.
 
-use std::path::PathBuf;
 use std::collections::BTreeMap;
+use std::path::PathBuf;
 
 type Expr = rnix::parser::Node;
 
@@ -28,13 +28,26 @@ pub enum Value {
 
     Float(f64),
 
-    Path(PathBuf),
+    Path(NixPath),
 
     Bool(bool),
 
-    Null,   // TODO null tracking
+    Null, // TODO null tracking
 
     List(Vec<Expr>),
 
     Set(BTreeMap<String, Expr>),
+}
+
+#[derive(Debug)]
+pub enum NixPath {
+    /// A relative, `~`-relative, or absolute path.
+    ///
+    /// Such a path might not exist.
+    Normal(PathBuf),
+    /// A store path on the Nix search path (`<file>`).
+    ///
+    /// When evaluated, this path is searched for in `NIX_PATH` (among other
+    /// things).
+    Store(PathBuf),
 }

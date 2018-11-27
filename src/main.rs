@@ -3,14 +3,22 @@
 
 #[macro_use]
 extern crate log;
-extern crate env_logger;
-extern crate rnix;
-extern crate rowan;
-extern crate codemap;
-extern crate codemap_diagnostic;
-extern crate structopt;
 #[macro_use]
 extern crate failure;
+extern crate codemap;
+extern crate codemap_diagnostic;
+extern crate console;
+extern crate directories;
+extern crate env_logger;
+extern crate hashbrown;
+extern crate num_traits;
+extern crate rnix;
+extern crate rowan;
+extern crate shawshank;
+extern crate structopt;
+extern crate tendril;
+extern crate toolshed;
+extern crate typed_arena;
 
 mod ast;
 mod config;
@@ -20,41 +28,41 @@ mod profile;
 mod utils;
 mod value;
 
-use utils::ResultExt;
-
-use codemap::CodeMap;
-use codemap_diagnostic::Emitter;
 use failure::Error;
-use structopt::StructOpt;
 use log::LevelFilter;
+use structopt::StructOpt;
 
-use std::process::exit;
-use std::cmp;
 use config::Config;
 use eval::EvalContext;
 use eval::Source;
+use std::cmp;
 use std::env;
+use std::process::exit;
 
 #[derive(StructOpt)]
 #[structopt(about = "A Nix expression evaluator")]
 struct Opts {
     #[structopt(parse(from_occurrences))]
     #[structopt(short = "v")]
-    #[structopt(help = "\
-        Increase verbosity:\n\
-        -v    Print debugging messages\n\
-        -vv   Print tracing messages\
-    ")]
+    #[structopt(
+        help = "\
+                Increase verbosity:\n\
+                -v    Print debugging messages\n\
+                -vv   Print tracing messages\
+                "
+    )]
     verbosity: u8,
 
     #[structopt(parse(from_occurrences))]
     #[structopt(short = "q")]
-    #[structopt(help = "\
-        Decrease verbosity:\n\
-        -q    Only print warnings and errors\n\
-        -qq   Only print errors\n\
-        -qqq  Do not print anything\
-    ")]
+    #[structopt(
+        help = "\
+                Decrease verbosity:\n\
+                -q    Only print warnings and errors\n\
+                -qq   Only print errors\n\
+                -qqq  Do not print anything\
+                "
+    )]
     quiet: u8,
 
     /// Collect and log timing data for internal operations.
@@ -109,9 +117,7 @@ fn run(opts: Opts) -> Result<(), Error> {
         profile::enable();
     }
 
-    let config = Config {
-        color: opts.color,
-    };
+    let config = Config { color: opts.color };
 
     match opts.cmd {
         Subcommand::Eval { expr } => {
@@ -133,7 +139,7 @@ fn main() {
     let opts = Opts::from_args();
 
     match run(opts) {
-        Ok(()) => {},
+        Ok(()) => {}
         Err(e) => {
             if e.downcast_ref::<utils::ErrorAlreadyPrinted>().is_none() {
                 eprintln!("error: {}", e);

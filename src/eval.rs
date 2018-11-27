@@ -1,15 +1,14 @@
-use value::Value;
-use parser;
-use utils::ResultExt;
+use ast::{Arenas, Ast};
 use config::Config;
+use utils::ResultExt;
+use value::Value;
+use {parser, profile};
 
-use codemap::{File, CodeMap};
-use codemap_diagnostic::Emitter;
+use codemap::{CodeMap, File};
+use codemap_diagnostic::{Diagnostic, Emitter};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::{fs, io};
-use codemap_diagnostic::Diagnostic;
-use profile;
 
 /// Nix expression source (file, command line, ...).
 pub enum Source<'a> {
@@ -57,9 +56,11 @@ impl EvalContext {
                 let source = profile::profile("reading", path, || fs::read_to_string(path))?;
                 (source, name, search_path)
             }
-            Source::Other { source, name, search_path } => {
-                (source.to_string(), name.to_string(), search_path.to_owned())
-            }
+            Source::Other {
+                source,
+                name,
+                search_path,
+            } => (source.to_string(), name.to_string(), search_path.to_owned()),
         };
 
         let file = self.codemap.add_file(name, source);
@@ -72,15 +73,10 @@ impl EvalContext {
     /// necessary operations to return a `Value` corresponding to the top-level
     /// expression in the source.
     pub fn eval(&mut self, source: Source) -> Result<Value, Error> {
-        use rnix::types::*;
-
         let file = self.assimilate_source(source)?;
-        let ast = parser::parse(&file).print_diagnostic(self)?;
-
-        let root = ast.root();
-        for c in root.children() {
-            debug!("{:?} {:?}", c, c.kind());
-        }
+        let raw_ast = parser::parse(&file).print_diagnostic(self)?;
+        let arenas = Arenas::new();
+        let _ast = Ast::build(&arenas, file, raw_ast).print_diagnostic(self)?;
 
         unimplemented!()
     }
@@ -97,7 +93,7 @@ impl ::utils::DiagnosticEmitter for EvalContext {
 pub enum Error {
     #[fail(display = "i/o error: {}", _0)]
     Io(#[fail(cause)] io::Error),
-    #[fail(display = "(see above)")]
+    #[fail(display = "(this should not be printed)")]
     AlreadyPrinted,
 }
 
