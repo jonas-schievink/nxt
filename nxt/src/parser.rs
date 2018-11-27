@@ -187,6 +187,8 @@ pub enum RawExpr<R: TreeRoot<Types>> {
     Set(Set<R>),
     /// A literal value.
     Value(rnix::types::Value<R>),
+    /// String literal with interpolated parts.
+    Interpol(Interpol<R>),
     /// `with e1; e2`
     With(With<R>),
 }
@@ -210,7 +212,7 @@ impl<R: TreeRoot<Types>> RawExpr<R> {
 
         match_expr!(
             Apply, Assert, IfElse, IndexSet, Lambda, LetIn, List, Operation, Unary,
-            OrDefault, Paren, Set, With
+            OrDefault, Paren, Set, With, Interpol
 
             else(kind) {
                 match kind {
