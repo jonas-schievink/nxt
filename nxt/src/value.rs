@@ -7,6 +7,18 @@ use tendril::StrTendril;
 
 type Expr = rnix::parser::Node;
 
+#[derive(Debug, Copy, Clone)]
+pub enum Type {
+    String,
+    Int,
+    Float,
+    Path,
+    Bool,
+    Null,
+    List,
+    Set,
+}
+
 /// The value a Nix expression was evaluated to.
 ///
 /// A Nix expression will remain in "unevaluated" state until its value is
@@ -52,6 +64,30 @@ pub enum NixPath {
     /// When evaluated, this path is searched for in `NIX_PATH` (among other
     /// things).
     Store(PathBuf),
+}
+
+impl Value {
+    pub fn type_(&self) -> Type {
+        match self {
+            Value::String(_) => Type::String,
+            Value::Int(_) => Type::Int,
+            Value::Float(_) => Type::Float,
+            Value::Path(_) => Type::Path,
+            Value::Bool(_) => Type::Bool,
+            Value::Null => Type::Null,
+            Value::List(_) => Type::List,
+            Value::Set(_) => Type::Set,
+        }
+    }
+
+    /// If this value is a boolean, returns it. If not, returns `None`.
+    pub fn as_bool(&self) -> Option<bool> {
+        if let Value::Bool(b) = self {
+            Some(*b)
+        } else {
+            None
+        }
+    }
 }
 
 impl fmt::Display for Value {

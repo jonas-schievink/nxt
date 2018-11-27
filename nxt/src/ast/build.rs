@@ -1,5 +1,6 @@
 use super::*;
-use parser;
+use parser::RawExpr;
+use rnix::value::{self, ValueError};
 use value::NixPath;
 
 use codemap::File;
@@ -19,9 +20,8 @@ pub struct Builder<'arenas, 'a> {
     search_path: &'a Path,
     /// The current scope stack.
     scopes: Vec<Scope>,
-    /// Maps `Variable` IDs to
+    /// Maps `Variable` IDs to their `VarInfo`.
     variables: Vec<VarInfo<'arenas>>,
-    next_variable: u32,
 }
 
 impl<'arenas, 'a> Builder<'arenas, 'a> {
@@ -41,7 +41,6 @@ impl<'arenas, 'a> Builder<'arenas, 'a> {
             search_path,
             scopes: vec![Scope::empty()],
             variables: vec![],
-            next_variable: 0,
         };
 
         this.define_variable(VarInfo {
@@ -63,19 +62,17 @@ impl<'arenas, 'a> Builder<'arenas, 'a> {
 
     pub fn build<R: TreeRoot<Types>>(
         &mut self,
-        root: parser::RawExpr<R>,
+        root: rnix::parser::Node<R>,
     ) -> Result<&'arenas Expr<'arenas>, Error> {
         self.translate_expr(root)
     }
 
     fn translate_expr<R: TreeRoot<Types>>(
         &mut self,
-        expr: parser::RawExpr<R>,
+        expr: rnix::parser::Node<R>,
     ) -> Result<&'arenas Expr<'arenas>, Error> {
-        use rnix::value::{self, ValueError};
-
-        match expr {
-            parser::RawExpr::Value(v) => {
+        match RawExpr::from(expr) {
+            RawExpr::Value(v) => {
                 let value = v.to_value().map_err(|e| {
                     let msg = match e {
                         ValueError::Float(err) => format!("invalid float: {}", err),
@@ -119,19 +116,27 @@ impl<'arenas, 'a> Builder<'arenas, 'a> {
 
                 Ok(self.arenas.alloc(Expr::Value(self.arenas.alloc(value))))
             }
-            parser::RawExpr::Apply(_) => unimplemented!(),
-            parser::RawExpr::Assert(_) => unimplemented!(),
-            parser::RawExpr::Ident(ident) => {
+            RawExpr::Apply(_) => unimplemented!(),
+            RawExpr::Assert(assert) => {
+                let cond = self.translate_expr(assert.condition())?;
+                let body = self.translate_expr(assert.body())?;
+
+                Ok(self.arenas.alloc(Expr::Assert {
+                    assertion: cond,
+                    then: body,
+                }))
+            }
+            RawExpr::Ident(ident) => {
                 let var = self.resolve_local_variable(ident.as_str()).map_err(|()| {
                     Error::at(self.file.clone(), &ident, "cannot resolve variable")
                 })?;
                 Ok(self.arenas.alloc(Expr::Variable(var)))
             }
-            parser::RawExpr::IfElse(_) => unimplemented!(),
-            parser::RawExpr::IndexSet(_) => unimplemented!(),
-            parser::RawExpr::Lambda(_) => unimplemented!(),
-            parser::RawExpr::LetIn(_) => unimplemented!(),
-            parser::RawExpr::List(_) => unimplemented!(),
+            RawExpr::IfElse(_) => unimplemented!(),
+            RawExpr::IndexSet(_) => unimplemented!(),
+            RawExpr::Lambda(_) => unimplemented!(),
+            RawExpr::LetIn(_) => unimplemented!(),
+            RawExpr::List(_) => unimplemented!(),
             _ => unimplemented!(),
         }
     }
@@ -165,7 +170,7 @@ impl<'arenas, 'a> Builder<'arenas, 'a> {
     /// If the scope already defines a variables named `name`, this returns an
     /// error.
     fn define_variable(&mut self, var: VarInfo<'arenas>) -> Result<Variable, ()> {
-        let variable = Variable(self.next_variable);
+        let variable = Variable(self.variables.len() as u32);
         let name = StrTendril::from(var.name);
 
         match self
@@ -180,7 +185,6 @@ impl<'arenas, 'a> Builder<'arenas, 'a> {
             }
             Entry::Vacant(vacant) => {
                 vacant.insert(variable);
-                self.next_variable += 1;
                 self.variables.push(var);
                 Ok(variable)
             }

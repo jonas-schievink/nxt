@@ -165,11 +165,11 @@ impl<'a> Ast<'a> {
         arenas: &'a Arenas,
         file: Arc<File>,
         search_path: &'a Path,
-        raw: parser::RawExpr<R>,
+        root: rnix::parser::Node<R>,
     ) -> Result<Self, Error> {
         let root = {
             let mut builder = Builder::new(&file, search_path, arenas);
-            builder.build(raw)?
+            builder.build(root)?
         };
 
         Ok(Self { arenas, root, file })

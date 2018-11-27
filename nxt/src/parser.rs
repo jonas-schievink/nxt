@@ -158,16 +158,16 @@ fn error_span(source: &File, error: &ParseError) -> Span {
 }
 
 /// Parses a Nix expression.
-pub fn parse(file: &Arc<File>) -> Result<RawExpr<OwnedRoot<Types>>, Error> {
+pub fn parse(file: &Arc<File>) -> Result<rnix::parser::Node<OwnedRoot<Types>>, Error> {
     profile("parsing", file.name(), || parse_impl(file))
 }
 
-fn parse_impl(expr: &Arc<File>) -> Result<RawExpr<OwnedRoot<Types>>, Error> {
+fn parse_impl(expr: &Arc<File>) -> Result<rnix::parser::Node<OwnedRoot<Types>>, Error> {
     let ast = rnix::parse(expr.source());
 
     extract_error(expr, ast.errors())?;
 
-    Ok(RawExpr::from_raw(ast.into_node().first_child().unwrap()))
+    Ok(ast.into_node().first_child().unwrap())
 }
 
 /// A raw expression parse tree.
@@ -205,7 +205,7 @@ impl<R: TreeRoot<Types>> RawExpr<R> {
     /// Converts a raw AST node to an `Expr` node.
     ///
     /// If `node` is not a valid expression node, this function will panic.
-    pub fn from_raw(node: rnix::parser::Node<R>) -> Self {
+    pub fn from(node: rnix::parser::Node<R>) -> Self {
         macro_rules! match_expr {
             ( $($node:tt),* else($elvar:ident) $el:expr ) => {
                 match node.kind() {

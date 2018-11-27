@@ -72,6 +72,9 @@ impl EvalContext {
     /// This will parse the source code in `source` and then perform all
     /// necessary operations to return a `Value` corresponding to the top-level
     /// expression in the source.
+    ///
+    /// This process might read and parse more `.nix` files from the file
+    /// system.
     pub fn eval(&mut self, source: Source) -> Result<Value, Error> {
         let (file, search_path) = self.assimilate_source(source)?;
         let raw_ast = parser::parse(&file).print_diagnostic(self)?;
@@ -101,6 +104,7 @@ impl ::utils::DiagnosticEmitter for EvalContext {
 pub enum Error {
     #[fail(display = "i/o error: {}", _0)]
     Io(#[fail(cause)] io::Error),
+
     #[fail(display = "(this should not be printed)")]
     AlreadyPrinted,
 }
