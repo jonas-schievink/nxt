@@ -14,6 +14,7 @@ use rowan::{OwnedRoot, TreeRoot};
 use std::fmt;
 use std::sync::Arc;
 
+/// A nicely formatted error pointing into a source file.
 #[derive(Debug)]
 pub struct Error {
     span: Span,
@@ -22,6 +23,13 @@ pub struct Error {
 }
 
 impl Error {
+    /// Creates an error pointing into a source file.
+    ///
+    /// # Parameters
+    ///
+    /// * `source`: Source file the error occurred in.
+    /// * `node`: Parse tree node to highlight.
+    /// * `message`: The error message.
     pub fn at<N, M, R>(source: Arc<File>, node: &N, message: M) -> Self
     where
         N: TypedNode<R>,
