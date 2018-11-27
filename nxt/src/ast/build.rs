@@ -9,7 +9,6 @@ use hashbrown::HashMap;
 use rnix::parser::Types;
 use rnix::value::Anchor;
 use rowan::TreeRoot;
-use std::env;
 use std::path::Path;
 use tendril::StrTendril;
 
@@ -26,6 +25,15 @@ pub struct Builder<'arenas, 'a> {
 }
 
 impl<'arenas, 'a> Builder<'arenas, 'a> {
+    /// Creates a new AST builder.
+    ///
+    /// # Parameters
+    ///
+    /// * `file`: Source file being processed.
+    /// * `search_path`: Path to prepend to relative paths (`./xyz`). This
+    ///   should be the directory containing the source file, or the current
+    ///   working directory if no real file is processed.
+    /// * `arenas`: Arenas to allocate AST nodes and data in.
     pub fn new(file: &'a Arc<File>, search_path: &'a Path, arenas: &'arenas Arenas) -> Self {
         let mut this = Self {
             arenas,
@@ -87,7 +95,7 @@ impl<'arenas, 'a> Builder<'arenas, 'a> {
                         content,
                         multiline: _,
                     }
-                    | value::Value::Path(Anchor::Uri, content) => Value::String(content),
+                    | value::Value::Path(Anchor::Uri, content) => Value::String(content.into()),
                     value::Value::Path(anchor, path) => Value::Path(match anchor {
                         Anchor::Absolute => NixPath::Normal(path.into()),
                         // Turn relative paths absolute by prepending the search dir

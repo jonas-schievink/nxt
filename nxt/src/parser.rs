@@ -7,7 +7,7 @@ use profile::profile;
 
 use codemap::{File, Span, SpanLoc};
 use codemap_diagnostic::{Diagnostic, Level, SpanLabel, SpanStyle};
-use rnix::parser::{NodeType, ParseError, Types, AST};
+use rnix::parser::{NodeType, ParseError, Types};
 use rnix::tokenizer::Token;
 use rnix::types::*;
 use rowan::{OwnedRoot, TreeRoot};

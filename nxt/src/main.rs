@@ -128,7 +128,7 @@ fn run(opts: Opts) -> Result<(), Error> {
                 search_path: &env::current_dir()?,
             })?;
 
-            println!("{:?}", value);
+            println!("{}", value);
 
             Ok(())
         }

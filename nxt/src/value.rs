@@ -1,7 +1,9 @@
 //! Defines dynamically typed Nix expression values.
 
 use std::collections::BTreeMap;
+use std::fmt;
 use std::path::PathBuf;
+use tendril::StrTendril;
 
 type Expr = rnix::parser::Node;
 
@@ -10,13 +12,13 @@ type Expr = rnix::parser::Node;
 /// A Nix expression will remain in "unevaluated" state until its value is
 /// needed, since Nix is a lazily evaluated language. Such unevaluated
 /// `Expr`s might be referred to by already evaluated `Value`s.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Value {
     /// A string or URI.
     ///
     /// The unquoted URI notation just results in a string, there is no separate
     /// URI type.
-    String(String),
+    String(StrTendril),
 
     /// A signed integer.
     ///
@@ -39,7 +41,7 @@ pub enum Value {
     Set(BTreeMap<String, Expr>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum NixPath {
     /// A relative, `~`-relative, or absolute path.
     ///
@@ -50,4 +52,20 @@ pub enum NixPath {
     /// When evaluated, this path is searched for in `NIX_PATH` (among other
     /// things).
     Store(PathBuf),
+}
+
+impl fmt::Display for Value {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Value::String(s) => s.fmt(f),
+            Value::Int(i) => i.fmt(f),
+            Value::Float(flt) => flt.fmt(f),
+            Value::Path(NixPath::Normal(p)) => p.display().fmt(f),
+            Value::Path(NixPath::Store(p)) => write!(f, "<{}>", p.display()),
+            Value::Bool(b) => b.fmt(f),
+            Value::Null => f.write_str("null"),
+            Value::List(vec) => f.debug_list().entries(vec.iter()).finish(),
+            Value::Set(map) => f.debug_map().entries(map.iter()).finish(),
+        }
+    }
 }

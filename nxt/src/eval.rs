@@ -1,4 +1,4 @@
-use ast::{Arenas, Ast};
+use ast::*;
 use config::Config;
 use utils::ResultExt;
 use value::Value;
@@ -79,7 +79,14 @@ impl EvalContext {
         let ast = Ast::build(&arenas, file, &search_path, raw_ast).print_diagnostic(self)?;
         debug!("AST={:#?}", ast);
 
-        unimplemented!()
+        self.eval_expr(ast.root())
+    }
+
+    fn eval_expr(&mut self, expr: &Expr) -> Result<Value, Error> {
+        match expr {
+            Expr::Value(val) => Ok((*val).clone()),
+            _ => unimplemented!(),
+        }
     }
 }
 
