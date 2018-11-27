@@ -46,7 +46,7 @@ impl EvalContext {
         }
     }
 
-    fn assimilate_source(&mut self, source: Source) -> Result<Arc<File>, Error> {
+    fn assimilate_source(&mut self, source: Source) -> Result<(Arc<File>, PathBuf), Error> {
         let (source, name, search_path) = match source {
             Source::File { path } => {
                 let name = path.display().to_string();
@@ -64,7 +64,7 @@ impl EvalContext {
         };
 
         let file = self.codemap.add_file(name, source);
-        Ok(file)
+        Ok((file, search_path))
     }
 
     /// Evaluates a Nix expression.
@@ -73,10 +73,11 @@ impl EvalContext {
     /// necessary operations to return a `Value` corresponding to the top-level
     /// expression in the source.
     pub fn eval(&mut self, source: Source) -> Result<Value, Error> {
-        let file = self.assimilate_source(source)?;
+        let (file, search_path) = self.assimilate_source(source)?;
         let raw_ast = parser::parse(&file).print_diagnostic(self)?;
         let arenas = Arenas::new();
-        let _ast = Ast::build(&arenas, file, raw_ast).print_diagnostic(self)?;
+        let ast = Ast::build(&arenas, file, &search_path, raw_ast).print_diagnostic(self)?;
+        debug!("AST={:#?}", ast);
 
         unimplemented!()
     }

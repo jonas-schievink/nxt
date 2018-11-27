@@ -19,6 +19,7 @@ use codemap::{File, Span};
 use rnix::parser::Types;
 use rowan::TreeRoot;
 use std::fmt;
+use std::path::Path;
 use std::sync::Arc;
 use toolshed::Arena as CopyArena;
 use typed_arena::Arena as TypedArena;
@@ -163,10 +164,11 @@ impl<'a> Ast<'a> {
     pub fn build<R: TreeRoot<Types>>(
         arenas: &'a Arenas,
         file: Arc<File>,
+        search_path: &'a Path,
         raw: parser::RawExpr<R>,
     ) -> Result<Self, Error> {
         let root = {
-            let mut builder = Builder::new(&file, arenas);
+            let mut builder = Builder::new(&file, search_path, arenas);
             builder.build(raw)?
         };
 

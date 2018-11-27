@@ -10,12 +10,14 @@ use rnix::parser::Types;
 use rnix::value::Anchor;
 use rowan::TreeRoot;
 use std::env;
+use std::path::Path;
 use tendril::StrTendril;
 
 /// The AST builder builds our simplified AST from a parse tree.
 pub struct Builder<'arenas, 'a> {
     arenas: &'arenas Arenas,
     file: &'a Arc<File>,
+    search_path: &'a Path,
     /// The current scope stack.
     scopes: Vec<Scope>,
     /// Maps `Variable` IDs to
@@ -24,10 +26,11 @@ pub struct Builder<'arenas, 'a> {
 }
 
 impl<'arenas, 'a> Builder<'arenas, 'a> {
-    pub fn new(file: &'a Arc<File>, arenas: &'arenas Arenas) -> Self {
+    pub fn new(file: &'a Arc<File>, search_path: &'a Path, arenas: &'arenas Arenas) -> Self {
         let mut this = Self {
             arenas,
             file,
+            search_path,
             scopes: vec![Scope::empty()],
             variables: vec![],
             next_variable: 0,
@@ -87,12 +90,11 @@ impl<'arenas, 'a> Builder<'arenas, 'a> {
                     | value::Value::Path(Anchor::Uri, content) => Value::String(content),
                     value::Value::Path(anchor, path) => Value::Path(match anchor {
                         Anchor::Absolute => NixPath::Normal(path.into()),
-                        // Turn relative paths absolute by prepending the working dir
+                        // Turn relative paths absolute by prepending the search dir
                         Anchor::Relative => {
-                            let mut pwd =
-                                env::current_dir().expect("working directory is not accessible");
-                            pwd.push(path);
-                            NixPath::Normal(pwd)
+                            let mut full_path = self.search_path.to_path_buf();
+                            full_path.push(path);
+                            NixPath::Normal(full_path)
                         }
                         Anchor::Home => {
                             let mut base = BaseDirs::new()
