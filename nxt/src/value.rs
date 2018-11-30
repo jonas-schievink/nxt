@@ -42,7 +42,14 @@ pub enum Value {
 
     Float(f64),
 
-    Path(NixPath),
+    /// A (home-)relative or absolute path, expanded to an absolute path when
+    /// parsing.
+    ///
+    /// Paths like `<this>`, which are searched for in `NIX_PATH`, are only
+    /// searched for when they're needed (they're `Expr`essions, not `Value`s).
+    /// When they're not found, evaluation aborts, while normal `Path`s can
+    /// refer to files that don't exist.
+    Path(PathBuf),
 
     Bool(bool),
 
@@ -51,19 +58,6 @@ pub enum Value {
     List(Vec<Expr>),
 
     Set(BTreeMap<String, Expr>),
-}
-
-#[derive(Debug, Clone)]
-pub enum NixPath {
-    /// A relative, `~`-relative, or absolute path.
-    ///
-    /// Such a path might not exist.
-    Normal(PathBuf),
-    /// A store path on the Nix search path (`<file>`).
-    ///
-    /// When evaluated, this path is searched for in `NIX_PATH` (among other
-    /// things).
-    Store(PathBuf),
 }
 
 impl Value {
@@ -96,8 +90,7 @@ impl fmt::Display for Value {
             Value::String(s) => s.fmt(f),
             Value::Int(i) => i.fmt(f),
             Value::Float(flt) => flt.fmt(f),
-            Value::Path(NixPath::Normal(p)) => p.display().fmt(f),
-            Value::Path(NixPath::Store(p)) => write!(f, "<{}>", p.display()),
+            Value::Path(p) => p.display().fmt(f),
             Value::Bool(b) => b.fmt(f),
             Value::Null => f.write_str("null"),
             Value::List(vec) => f.debug_list().entries(vec.iter()).finish(),

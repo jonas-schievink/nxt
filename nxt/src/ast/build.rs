@@ -1,7 +1,6 @@
 use super::*;
 use parser::RawExpr;
 use rnix::value::{self, ValueError};
-use value::NixPath;
 
 use codemap::File;
 use directories::BaseDirs;
@@ -93,13 +92,13 @@ impl<'arenas, 'a> Builder<'arenas, 'a> {
                         multiline: _,
                     }
                     | value::Value::Path(Anchor::Uri, content) => Value::String(content.into()),
-                    value::Value::Path(anchor, path) => Value::Path(match anchor {
-                        Anchor::Absolute => NixPath::Normal(path.into()),
+                    value::Value::Path(anchor, path) => match anchor {
+                        Anchor::Absolute => Value::Path(path.into()),
                         // Turn relative paths absolute by prepending the search dir
                         Anchor::Relative => {
                             let mut full_path = self.search_path.to_path_buf();
                             full_path.push(path);
-                            NixPath::Normal(full_path)
+                            Value::Path(full_path)
                         }
                         Anchor::Home => {
                             let mut base = BaseDirs::new()
@@ -107,11 +106,16 @@ impl<'arenas, 'a> Builder<'arenas, 'a> {
                                 .home_dir()
                                 .to_path_buf();
                             base.push(path);
-                            NixPath::Normal(base)
+                            Value::Path(base)
                         }
-                        Anchor::Store => NixPath::Store(path.into()),
+                        Anchor::Store => {
+                            // `<path>`-style paths are resolved lazily, so they're actually `Expr`s
+                            // instead of `Value`s.
+                            let path = Path::new(self.arenas.alloc_str(&path));
+                            return Ok(self.arenas.alloc(Expr::NixPath(path)));
+                        },
                         Anchor::Uri => unreachable!(), // handled above
-                    }),
+                    },
                 };
 
                 Ok(self.arenas.alloc(Expr::Value(self.arenas.alloc(value))))

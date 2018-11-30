@@ -95,6 +95,12 @@ pub enum Expr<'a> {
         body: &'a Expr<'a>,
     },
 
+    /// A `<path>` expression.
+    ///
+    /// Note that this is only for angle-bracketed paths that are searched for
+    /// in `NIX_PATH`, not for other kinds of paths, which are just `Value`s.
+    NixPath(&'a Path),
+
     /// A literal value.
     Value(&'a Value),
 
@@ -153,8 +159,6 @@ pub enum AttrPart<'a> {
 }
 
 pub struct Ast<'a> {
-    #[allow(unused)]
-    arenas: &'a Arenas,
     root: &'a Expr<'a>,
     file: Arc<File>,
 }
@@ -172,7 +176,7 @@ impl<'a> Ast<'a> {
             builder.build(root)?
         };
 
-        Ok(Self { arenas, root, file })
+        Ok(Self { root, file })
     }
 
     /// Returns the root expression represented by this AST.
@@ -209,6 +213,10 @@ impl Arenas {
 
     fn alloc<'a, T: ArenaBacked>(&'a self, t: T) -> &'a mut T {
         t.alloc_in_arena(self)
+    }
+
+    fn alloc_str(&self, s: &str) -> &str {
+        self.copy.alloc_str(s)
     }
 }
 
