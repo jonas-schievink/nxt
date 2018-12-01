@@ -38,6 +38,7 @@ use eval::Source;
 use std::cmp;
 use std::env;
 use std::process::exit;
+use ast::Arenas;
 
 #[derive(StructOpt)]
 #[structopt(about = "A Nix expression evaluator")]
@@ -121,7 +122,8 @@ fn run(opts: Opts) -> Result<(), Error> {
 
     match opts.cmd {
         Subcommand::Eval { expr } => {
-            let mut eval = EvalContext::new(config);
+            let arenas = Arenas::new();
+            let mut eval = EvalContext::new(config, &arenas);
             let value = eval.eval(Source::Other {
                 source: &expr,
                 name: "<cmdline>",

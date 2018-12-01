@@ -12,7 +12,7 @@
 mod build;
 
 use self::build::Builder;
-use parser::{self, Error};
+use parser::Error;
 use value::Value;
 
 use codemap::{File, Span};
@@ -89,7 +89,7 @@ pub enum Expr<'a> {
     NixPath(&'a Path),
 
     /// A literal value.
-    Value(&'a Value),
+    Value(&'a Value<'a>),
 
     /// A local variable.
     Variable(Variable),
@@ -158,9 +158,9 @@ pub struct Ast<'a> {
 impl<'a> Ast<'a> {
     /// Builds a high-level AST from a raw expression parse tree.
     pub fn build<R: TreeRoot<Types>>(
-        arenas: &'a Arenas,
+        arenas: &'a Arenas<'a>,
         file: Arc<File>,
-        search_path: &'a Path,
+        search_path: &Path,
         root: rnix::parser::Node<R>,
     ) -> Result<Self, Error> {
         let root = {
@@ -187,15 +187,15 @@ impl<'a> fmt::Debug for Ast<'a> {
 ///
 /// We use one `copy_arena` for all `Copy` types that don't need drop logic, and
 /// one `typed_arena` per type that *does* need `Drop` to be invoked.
-pub struct Arenas {
+pub struct Arenas<'a> {
     /// Arena for `Copy` types (most of the AST) that don't need drop logic.
     copy: CopyArena,
 
     /// Arena for `Value` instances.
-    values: TypedArena<Value>,
+    values: TypedArena<Value<'a>>,
 }
 
-impl Arenas {
+impl<'a> Arenas<'a> {
     pub fn new() -> Self {
         Self {
             copy: CopyArena::new(),
@@ -203,7 +203,7 @@ impl Arenas {
         }
     }
 
-    fn alloc<'a, T: ArenaBacked>(&'a self, t: T) -> &'a mut T {
+    fn alloc<T: ArenaBacked<'a> + 'a>(&self, t: T) -> &mut T {
         t.alloc_in_arena(self)
     }
 
@@ -213,20 +213,20 @@ impl Arenas {
 }
 
 /// Trait implemented by all types that can be allocated in `Arenas`.
-trait ArenaBacked {
-    fn alloc_in_arena<'a>(self, arenas: &'a Arenas) -> &'a mut Self;
+trait ArenaBacked<'a> {
+    fn alloc_in_arena<'arenas>(self, arenas: &'arenas Arenas<'a>) -> &'arenas mut Self;
 }
 
 /// We can handle *all* `Copy` types easily.
-impl<T: Copy> ArenaBacked for T {
-    fn alloc_in_arena(self, arenas: &Arenas) -> &mut Self {
+impl<'a, T: Copy> ArenaBacked<'a> for T {
+    fn alloc_in_arena<'arenas>(self, arenas: &'arenas Arenas<'a>) -> &'arenas mut Self {
         arenas.copy.alloc(self)
     }
 }
 
 /// Types implementing `Drop` (or needing drop glue) need specialized arenas.
-impl ArenaBacked for Value {
-    fn alloc_in_arena(self, arenas: &Arenas) -> &mut Self {
+impl<'a> ArenaBacked<'a> for Value<'a> {
+    fn alloc_in_arena<'arenas>(self, arenas: &'arenas Arenas<'a>) -> &'arenas mut Self {
         arenas.values.alloc(self)
     }
 }

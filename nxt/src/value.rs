@@ -1,11 +1,11 @@
 //! Defines dynamically typed Nix expression values.
 
+use ast::Expr;
+
 use std::collections::BTreeMap;
 use std::fmt;
 use std::path::PathBuf;
 use tendril::StrTendril;
-
-type Expr = rnix::parser::Node;
 
 #[derive(Debug, Copy, Clone)]
 pub enum Type {
@@ -25,7 +25,7 @@ pub enum Type {
 /// needed, since Nix is a lazily evaluated language. Such unevaluated
 /// `Expr`s might be referred to by already evaluated `Value`s.
 #[derive(Debug, Clone)]
-pub enum Value {
+pub enum Value<'a> {
     /// A string or URI.
     ///
     /// The unquoted URI notation just results in a string, there is no separate
@@ -55,12 +55,12 @@ pub enum Value {
 
     Null, // TODO null tracking
 
-    List(Vec<Expr>),
+    List(Vec<&'a Expr<'a>>),
 
-    Set(BTreeMap<String, Expr>),
+    Set(BTreeMap<String, &'a Expr<'a>>),
 }
 
-impl Value {
+impl<'a> Value<'a> {
     pub fn type_(&self) -> Type {
         match self {
             Value::String(_) => Type::String,
@@ -84,7 +84,7 @@ impl Value {
     }
 }
 
-impl fmt::Display for Value {
+impl<'a> fmt::Display for Value<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Value::String(s) => write!(f, "\"{}\"", s),

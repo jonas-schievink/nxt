@@ -14,7 +14,7 @@ use tendril::StrTendril;
 
 /// The AST builder builds our simplified AST from a parse tree.
 pub struct Builder<'arenas, 'a> {
-    arenas: &'arenas Arenas,
+    arenas: &'arenas Arenas<'arenas>,
     file: &'a Arc<File>,
     search_path: &'a Path,
     /// The current scope stack.
@@ -33,7 +33,7 @@ impl<'arenas, 'a> Builder<'arenas, 'a> {
     ///   should be the directory containing the source file, or the current
     ///   working directory if no real file is processed.
     /// * `arenas`: Arenas to allocate AST nodes and data in.
-    pub fn new(file: &'a Arc<File>, search_path: &'a Path, arenas: &'arenas Arenas) -> Self {
+    pub fn new(file: &'a Arc<File>, search_path: &'a Path, arenas: &'arenas Arenas<'arenas>) -> Self {
         let mut this = Self {
             arenas,
             file,

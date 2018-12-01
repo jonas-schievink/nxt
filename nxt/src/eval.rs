@@ -33,14 +33,16 @@ pub enum Source<'a> {
     },
 }
 
-pub struct EvalContext {
+pub struct EvalContext<'a> {
+    arenas: &'a Arenas<'a>,
     codemap: CodeMap,
     config: Config,
 }
 
-impl EvalContext {
-    pub fn new(config: Config) -> Self {
+impl<'a> EvalContext<'a> {
+    pub fn new(config: Config, arenas: &'a Arenas<'a>) -> Self {
         Self {
+            arenas,
             codemap: CodeMap::new(),
             config,
         }
@@ -75,17 +77,16 @@ impl EvalContext {
     ///
     /// This process might read and parse more `.nix` files from the file
     /// system.
-    pub fn eval(&mut self, source: Source) -> Result<Value, Error> {
+    pub fn eval(&mut self, source: Source) -> Result<Value<'a>, Error> {
         let (file, search_path) = self.assimilate_source(source)?;
         let raw_ast = parser::parse(&file).print_diagnostic(self)?;
-        let arenas = Arenas::new();
-        let ast = Ast::build(&arenas, file, &search_path, raw_ast).print_diagnostic(self)?;
+        let ast = Ast::build(&self.arenas, file, &search_path, raw_ast).print_diagnostic(self)?;
         debug!("AST={:#?}", ast);
 
         self.eval_expr(ast.root())
     }
 
-    fn eval_expr(&mut self, expr: &Expr) -> Result<Value, Error> {
+    fn eval_expr<'e>(&mut self, expr: &'e Expr<'e>) -> Result<Value<'e>, Error> {
         match expr {
             Expr::Value(val) => Ok((*val).clone()),
             _ => unimplemented!(),
@@ -93,7 +94,7 @@ impl EvalContext {
     }
 }
 
-impl ::utils::DiagnosticEmitter for EvalContext {
+impl<'a> ::utils::DiagnosticEmitter for EvalContext<'a> {
     fn emit_diagnostics(&mut self, diags: &[Diagnostic]) {
         let mut emitter = Emitter::stderr(self.config.color.into(), Some(&self.codemap));
         emitter.emit(diags);
