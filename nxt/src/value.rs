@@ -87,7 +87,7 @@ impl Value {
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Value::String(s) => s.fmt(f),
+            Value::String(s) => write!(f, "\"{}\"", s),
             Value::Int(i) => i.fmt(f),
             Value::Float(flt) => flt.fmt(f),
             Value::Path(p) => p.display().fmt(f),

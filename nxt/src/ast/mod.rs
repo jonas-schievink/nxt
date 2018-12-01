@@ -102,14 +102,19 @@ pub enum Expr<'a> {
 #[derive(Debug, Copy, Clone)]
 pub struct Variable(u32);
 
-/// Informatioon associated to a `Variable`.
+impl Into<usize> for Variable {
+    fn into(self) -> usize { self.0 as usize }
+}
+
+/// Information about a local variable.
 #[derive(Debug, Copy, Clone)]
 pub struct VarInfo<'a> {
     /// The span containing the variable name at the declaration site.
     pub decl_span: Span,
     /// The variable name (can collide with other variables).
     pub name: &'a str,
-    pub value: &'a Expr<'a>,
+    /// The expression assigned to the variable.
+    pub expr: &'a Expr<'a>,
 }
 
 /// An attribute or variable path.

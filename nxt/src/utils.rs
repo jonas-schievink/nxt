@@ -1,6 +1,9 @@
 use codemap_diagnostic::{Diagnostic, Emitter};
 
 use std::str::FromStr;
+use std::ops::Index;
+use std::ops::IndexMut;
+use std::marker::PhantomData;
 
 /// Trait for all types that have access to a diagnostic emitter.
 ///
@@ -82,3 +85,30 @@ impl Into<::codemap_diagnostic::ColorConfig> for ColorConfig {
 #[derive(Debug, Fail)]
 #[fail(display = "invalid color configuration (try `always` or `never`)")]
 pub struct InvalidColorConfig;
+
+/// A `Vec<T>` that can only be indexed by `I`.
+pub struct IndexVec<T, I>(Vec<T>, PhantomData<I>);
+
+impl<T, I> IndexVec<T, I> where I: Into<usize> {
+    pub fn new() -> Self {
+        IndexVec(Vec::new(), PhantomData)
+    }
+
+    pub fn with_capacity(capacity: usize) -> Self {
+        IndexVec(Vec::with_capacity(capacity), PhantomData)
+    }
+}
+
+impl<T, I> Index<I> for IndexVec<T, I> where I: Into<usize> {
+    type Output = T;
+
+    fn index(&self, index: I) -> &T {
+        &self.0[index.into()]
+    }
+}
+
+impl<T, I> IndexMut<I> for IndexVec<T, I> where I: Into<usize> {
+    fn index_mut(&mut self, index: I) -> &mut T {
+        &mut self.0[index.into()]
+    }
+}

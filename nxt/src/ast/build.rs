@@ -45,14 +45,14 @@ impl<'arenas, 'a> Builder<'arenas, 'a> {
         this.define_variable(VarInfo {
             decl_span: file.span.subspan(0, 0),
             name: "true",
-            value: this
+            expr: this
                 .arenas
                 .alloc(Expr::Value(this.arenas.alloc(Value::Bool(true)))),
         }).unwrap();
         this.define_variable(VarInfo {
             decl_span: file.span.subspan(0, 0),
             name: "false",
-            value: this
+            expr: this
                 .arenas
                 .alloc(Expr::Value(this.arenas.alloc(Value::Bool(false)))),
         }).unwrap();
