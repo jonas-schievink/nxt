@@ -82,19 +82,6 @@ pub enum Expr<'a> {
         body: &'a Expr<'a>,
     },
 
-    /// `let <bindings> in <body>`
-    ///
-    /// Binds expressions to variables/attributes, creating a new scope in which
-    /// `body` is evaluated. Existing variables are shadowed.
-    ///
-    /// Note that all bound variables can be referred to by other bindings,
-    /// potentially allowing infinite recursion (like recursive sets).
-    LetIn {
-        /// "Desugared" bindings.
-        bindings: &'a [(Variable, Expr<'a>)],
-        body: &'a Expr<'a>,
-    },
-
     /// A `<path>` expression.
     ///
     /// Note that this is only for angle-bracketed paths that are searched for
