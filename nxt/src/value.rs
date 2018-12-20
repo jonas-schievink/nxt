@@ -1,7 +1,8 @@
 //! Defines dynamically typed Nix expression values.
 
-use ast::Expr;
+use ast::{Lambda, Expr};
 
+use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::fmt;
 use std::path::PathBuf;
@@ -97,4 +98,38 @@ impl<'a> fmt::Display for Value<'a> {
             Value::Set(map) => f.debug_map().entries(map.iter()).finish(),
         }
     }
+}
+
+/// A lazily evaluated computation along with its captured environment.
+///
+/// During AST construction, transparent lambdas that take no arguments are
+/// inserted to create lazily evaluated expressions in places that need this
+/// (eg. values assigned to sets). Instantiating (not applying) a lambda will
+/// capture its environment (the free variables it references) and create a
+/// closure.
+///
+/// An instantiated closure can be evaluated directly if it takes no arguments
+/// (hence becoming "transparent"), or as part of a matching `Apply` expression
+/// (yielding an error if the arguments don't match).
+#[derive(Debug)]
+pub struct Closure<'a> {
+    /// Interior mutability is used to update the closure when it's evaluated.
+    inner: RefCell<ClosureInner<'a>>,
+}
+
+#[derive(Debug)]
+enum ClosureInner<'a> {
+    /// Closure has been forced already.
+    Evaluated(Value<'a>),
+
+    /// Closure has not been evaluated yet.
+    ///
+    /// The closure can be evaluated once and moved to the `Evaluated` state.
+    Unevaluated {
+        /// Captured free variables from outside the lambda.
+        captures: Vec<Closure<'a>>,
+
+        /// The lambda this closure was created from.
+        lambda: &'a Lambda<'a>,
+    },
 }

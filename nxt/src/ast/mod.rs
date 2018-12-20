@@ -24,17 +24,6 @@ use std::sync::Arc;
 use toolshed::Arena as CopyArena;
 use typed_arena::Arena as TypedArena;
 
-/*
-
-AST building:
-
-* Arena-backed
-* Fully visit every node that introduces a new variable scope, and resolve all
-  idents. Any mention of an undeclared variable is actually an error in Nix, so
-  it must be an error here too.
-
-*/
-
 /// An expression.
 #[derive(Debug, Copy, Clone)]
 pub enum Expr<'a> {
@@ -76,11 +65,12 @@ pub enum Expr<'a> {
         index: &'a Expr<'a>,
     },
 
-    /// Instantiate a lambda.
-    Lambda {
-        argument: (), // complex due to pattern matching
-        body: &'a Expr<'a>,
-    },
+    /// Instantiate a lambda, supplying all free variables and building a
+    /// closure.
+    ///
+    /// For *application* of lambdas and other function-like things, see
+    /// `Apply`.
+    Lambda(Lambda<'a>),
 
     /// A `<path>` expression.
     ///
@@ -93,6 +83,34 @@ pub enum Expr<'a> {
 
     /// A local variable.
     Variable(Variable),
+}
+
+#[derive(Copy, Clone)]
+pub struct Lambda<'a> {
+    /// Flattened captured variables (aka free vars, upvars, upvalues) from the
+    /// containing function.
+    ///
+    /// During AST building, we propagate captured variables up to the
+    /// containing lambda if they are declared in a "grandparent". This flattens
+    /// the captures, which means that they only need to refer to variables
+    /// declared in the direct parent. It also ensures that all captured
+    /// variables are kept alive for as long as they might be needed in any
+    /// contained lambda, which can be tricky due to laziness.
+    captures: &'a [Variable],
+
+    /// Describes the parameters the lambda expects.
+    ///
+    /// Can be `None` for compiler-generated "transparent" lambdas that
+    /// facilitate lazy evaluation.
+    param: Option<LambdaParameter>,
+
+    /// The expression this lambda evaluates to when called.
+    body: &'a Expr<'a>,
+}
+
+#[derive(Copy, Clone)]
+pub enum LambdaParameter {
+    // TODO
 }
 
 /// A resolved local variable.
