@@ -85,7 +85,7 @@ pub enum Expr<'a> {
     Variable(Variable),
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct Lambda<'a> {
     /// Flattened captured variables (aka free vars, upvars, upvalues) from the
     /// containing function.
@@ -108,7 +108,7 @@ pub struct Lambda<'a> {
     body: &'a Expr<'a>,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub enum LambdaParameter {
     // TODO
 }
